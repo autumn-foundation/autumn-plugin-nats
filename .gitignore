@@ -1,0 +1,21 @@
+# Rust
+/target/
+**/*.rs.bk
+proptest-regressions/
+
+# Editor
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Env
+.env
+
+# Scratch build logs
+.*.log

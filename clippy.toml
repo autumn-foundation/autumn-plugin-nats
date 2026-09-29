@@ -1,0 +1,2 @@
+# clippy.toml — workspace clippy config for autumn-plugin-nats
+# (kept minimal; the lint levels live in Cargo.toml [lints.clippy])
