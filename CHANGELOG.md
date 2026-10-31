@@ -3,6 +3,12 @@
 All notable changes to this project follow
 [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [Unreleased]
+
+### Changed
+
+- Support `autumn-web` 0.9. The plugin now needs `autumn-web` 0.9.
+
 ## [0.1.0] - 2026-09-29
 
 ### Added
