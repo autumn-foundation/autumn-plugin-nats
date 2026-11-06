@@ -30,6 +30,8 @@ cargo run --example pubsub   # needs a NATS server on localhost:4222 (or NATS_UR
 
 ## Rules
 
+- README Rust snippets are doctests. Make them compile; use `no_run`, not `ignore`.
+  `tests/doc_snippets.rs` checks the TOML snippets and the version pins in the docs.
 - Ground Autumn APIs against the docs MCP (`~/workspace/skills/autumn-mcp/bin/mcp.py`), never training memory.
 - Ground `async-nats` APIs against docs.rs (this repo pins async-nats 0.50; the API moved a lot since 0.3x).
 - Edition 2024. No `unwrap`/`expect`/`panic`/`todo`/`unimplemented` in production code (tests may use them). `unsafe_code = forbid`.

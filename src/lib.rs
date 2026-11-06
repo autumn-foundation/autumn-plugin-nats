@@ -80,3 +80,8 @@ pub use config::{AuthMethod, ConfigError, NatsConfig};
 pub use error::{ErrorKind, NatsError, NatsResultExt};
 pub use jetstream::{JetStream, JsConsumer, JsMessage, JsStream, KvBucket, ObjectBucket};
 pub use plugin::{NatsPlugin, PLUGIN_NAME};
+
+/// Compiles the Rust snippets of the README as doctests.
+#[cfg(doctest)]
+#[doc = include_str!("../README.md")]
+pub struct ReadmeDoctests;
