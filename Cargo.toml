@@ -2,7 +2,7 @@
 name = "autumn-plugin-nats"
 version = "0.1.0"
 edition = "2024"
-rust-version = "1.88"
+rust-version = "1.97"
 description = "Autumn plugin: NATS messaging (pub/sub, request/reply, JetStream) for Autumn apps."
 license = "Apache-2.0"
 repository = "https://github.com/madmax983/autumn-plugin-nats"
@@ -13,7 +13,7 @@ exclude = [".github/", "docs/", "CLAUDE.md", "clippy.toml", "proptest-regression
 
 [dependencies]
 # No default features: the host app selects the Autumn features.
-autumn-web = { version = ">=0.9, <0.10", default-features = false }
+autumn-web = { version = ">=0.10, <0.11", default-features = false }
 # No default features: the plugin enables exactly the NATS surface it uses
 # (core client, TLS via ring, JetStream, KV, object store, NKey auth).
 async-nats = { version = "0.50", default-features = false, features = [
