@@ -84,6 +84,11 @@ overrides `[nats]`, and `autumn-<name>.toml` overrides both.
 - Background consumers: `NatsPlugin::consumer`, `NatsPlugin::queue_consumer`
   and `NatsPlugin::jetstream_consumer` run subscriptions as tasks. The
   JetStream consumer acks each message after the handler runs.
+- Roles: the consumers run in the `nats.consumers` background task. Its
+  capability is `nats.consumer`, with the parent `job_workers`. So
+  `combined` and `worker` run the consumers, and `web` only connects. A
+  named role can turn them off with
+  `[roles.<name>] capabilities = { "nats.consumer" = false }`.
 - A readiness check (`nats`, via a flush round trip) and Prometheus metrics
   (`nats_published_total`, `nats_received_total`, `nats_requests_total`,
   `nats_jetstream_published_total`).

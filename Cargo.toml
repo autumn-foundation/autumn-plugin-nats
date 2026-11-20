@@ -13,7 +13,7 @@ exclude = [".github/", "docs/", "CLAUDE.md", "clippy.toml", "proptest-regression
 
 [dependencies]
 # No default features: the host app selects the Autumn features.
-autumn-web = { version = ">=0.10, <0.11", default-features = false }
+autumn-web = { version = ">=0.11, <0.12", default-features = false }
 # No default features: the plugin enables exactly the NATS surface it uses
 # (core client, TLS via ring, JetStream, KV, object store, NKey auth).
 async-nats = { version = "0.50", default-features = false, features = [

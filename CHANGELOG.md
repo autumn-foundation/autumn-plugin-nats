@@ -7,8 +7,12 @@ All notable changes to this project follow
 
 ### Changed
 
-- Support `autumn-web` 0.10. The plugin now needs `autumn-web` 0.10 and
+- Support `autumn-web` 0.11. The plugin now needs `autumn-web` 0.11 and
   Rust 1.97.
+- The consumers run in the `nats.consumers` background task, with the
+  capability `nats.consumer` (parent `job_workers`). A `web` replica
+  connects and publishes, but runs no consumer. `/actuator/tasks` and
+  `autumn graph` list the task.
 
 ## [0.1.0] - 2026-09-29
 
