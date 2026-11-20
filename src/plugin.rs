@@ -18,8 +18,10 @@ use std::sync::{Arc, Mutex, OnceLock};
 
 use autumn_web::actuator::{MetricFamily, MetricsSource};
 use autumn_web::app::AppBuilder;
+use autumn_web::background::PluginCapability;
 use autumn_web::plugin::Plugin;
-use autumn_web::{AppState, AutumnError};
+use autumn_web::reexports::tokio_util::sync::CancellationToken;
+use autumn_web::{AppState, AutumnError, Capability};
 use futures_util::StreamExt;
 
 use crate::client::Nats;
@@ -40,7 +42,7 @@ pub type BoxFuture = Pin<Box<dyn Future<Output = ()> + Send + 'static>>;
 
 /// A core NATS subscription that runs as a background task.
 #[derive(Clone)]
-struct CoreConsumer {
+pub(crate) struct CoreConsumer {
     subject: String,
     queue_group: Option<String>,
     handler: Arc<dyn Fn(async_nats::Message) -> BoxFuture + Send + Sync>,
@@ -48,13 +50,25 @@ struct CoreConsumer {
 
 /// A `JetStream` durable push consumer that runs as a background task.
 #[derive(Clone)]
-struct StreamConsumer {
+pub(crate) struct StreamConsumer {
     stream: String,
     subjects: Vec<String>,
     durable_name: String,
     filter_subject: String,
     handler: Arc<dyn Fn(JsMessage) -> BoxFuture + Send + Sync>,
 }
+
+/// The capability of the consumers.
+///
+/// A role runs it when it runs job workers (`combined`, `worker`). A named
+/// role can turn it off:
+/// `[roles.<name>] capabilities = { "nats.consumer" = false }`.
+pub const NATS_CONSUMER: PluginCapability =
+    PluginCapability::new("nats.consumer", Capability::JobWorkers);
+
+/// The name of the background task that runs the consumers.
+/// `/actuator/tasks` and `autumn graph` show it.
+pub const CONSUMER_TASK: &str = "nats.consumers";
 
 /// State that the plugin hooks share.
 #[derive(Default)]
@@ -64,8 +78,8 @@ pub(crate) struct Shared {
 }
 
 impl Shared {
-    /// Aborts the consumer tasks and drains the connection.
-    async fn shutdown(&self) {
+    /// Aborts the consumer tasks.
+    fn stop_consumers(&self) {
         let tasks = self
             .tasks
             .lock()
@@ -74,6 +88,17 @@ impl Shared {
         for task in tasks {
             task.abort();
         }
+    }
+
+    /// The number of consumer tasks.
+    #[cfg(test)]
+    pub(crate) fn consumer_count(&self) -> usize {
+        self.tasks.lock().map_or(0, |tasks| tasks.len())
+    }
+
+    /// Aborts the consumer tasks and drains the connection.
+    async fn shutdown(&self) {
+        self.stop_consumers();
         if let Some(nats) = self.handle.get()
             && let Err(err) = nats.drain().await
         {
@@ -275,28 +300,29 @@ impl Plugin for NatsPlugin {
         let resolved = Arc::new(resolved);
         let core_consumers = Arc::new(core_consumers);
         let stream_consumers = Arc::new(stream_consumers);
+        let on_consume = Arc::clone(&shared);
         app.on_startup(move |state| {
             let shared = Arc::clone(&on_start);
             let metrics = Arc::clone(&start_metrics);
             let resolved = Arc::clone(&resolved);
-            let core_consumers = Arc::clone(&core_consumers);
-            let stream_consumers = Arc::clone(&stream_consumers);
             async move {
                 let config = resolved.as_ref().clone().map_err(|err| boot_error(&err))?;
                 let nats = Nats::connect_with(config, Arc::clone(&metrics))
                     .await
                     .map_err(|err| boot_error(&err))?;
                 state.insert_extension(nats.clone());
-                let _ = shared.handle.set(nats.clone());
-                for consumer in core_consumers.iter().cloned() {
-                    spawn_core_consumer(&shared, nats.clone(), consumer);
-                }
-                for consumer in stream_consumers.iter().cloned() {
-                    spawn_stream_consumer(&shared, nats.clone(), consumer);
-                }
+                let _ = shared.handle.set(nats);
                 tracing::info!("the NATS plugin is ready");
                 Ok(())
             }
+        })
+        .background_task(CONSUMER_TASK, NATS_CONSUMER, move |_state, shutdown| {
+            run_consumers(
+                Arc::clone(&on_consume),
+                Arc::clone(&core_consumers),
+                Arc::clone(&stream_consumers),
+                shutdown,
+            )
         })
         .on_shutdown(move || {
             let shared = Arc::clone(&shared);
@@ -305,6 +331,30 @@ impl Plugin for NatsPlugin {
             }
         })
     }
+}
+
+/// Starts the consumers and keeps them until `shutdown`. The
+/// `nats.consumers` background task runs this. The framework starts it only
+/// on a role that runs [`NATS_CONSUMER`]. Without a connection it does
+/// nothing.
+pub(crate) async fn run_consumers(
+    shared: Arc<Shared>,
+    core_consumers: Arc<Vec<CoreConsumer>>,
+    stream_consumers: Arc<Vec<StreamConsumer>>,
+    shutdown: CancellationToken,
+) -> autumn_web::AutumnResult<()> {
+    let Some(nats) = shared.handle.get().cloned() else {
+        return Ok(());
+    };
+    for consumer in core_consumers.iter().cloned() {
+        spawn_core_consumer(&shared, nats.clone(), consumer);
+    }
+    for consumer in stream_consumers.iter().cloned() {
+        spawn_stream_consumer(&shared, nats.clone(), consumer);
+    }
+    shutdown.cancelled().await;
+    shared.stop_consumers();
+    Ok(())
 }
 
 /// Spawns a core subscription as a background task.
